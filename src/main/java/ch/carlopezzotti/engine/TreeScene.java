@@ -32,6 +32,11 @@ public class TreeScene {
         for (Node n : sorted) renderNode(engine, g, w, h, n);
     }
 
+    
+    public List<Node> getNodes() {
+        return nodes;
+    }
+
     private void renderNode(Engine engine, Graphics g, int w, int h, Node n) {
         g.setColor(n.getColor());
         for (int[] f : n.getFaces()) {

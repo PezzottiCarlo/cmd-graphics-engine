@@ -1,16 +1,9 @@
 // File: src/ch/carlopezzotti/Main.java
 package ch.carlopezzotti;
 
-import ch.carlopezzotti.engine.BrailleDisplay;
-import ch.carlopezzotti.engine.Camera;
-import ch.carlopezzotti.engine.Display;
-import ch.carlopezzotti.engine.Engine;
-import ch.carlopezzotti.engine.Engine.Color;
-import ch.carlopezzotti.engine.Engine.Graphics;
-import ch.carlopezzotti.engine.KeyCaptureWindow;
-import ch.carlopezzotti.engine.TreeScene;
-import ch.carlopezzotti.engine.Node;
+import ch.carlopezzotti.engine.*;
 import ch.carlopezzotti.engine.helper.Vector3;
+import ch.carlopezzotti.engine.helper.Transform;
 
 import javax.swing.SwingUtilities;
 import java.awt.event.KeyEvent;
@@ -19,221 +12,182 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class Main implements KeyCaptureWindow.KeyListener {
     private volatile boolean w, a, s, d;
     private volatile boolean left, rightt;
 
     private static final double MOVE_SPEED = 10.0;
-    private static final double ROT_SPEED = Math.PI;
+    private static final double ROT_SPEED  = Math.PI;
     private static Engine engine;
+    private static List<Node> enemies;
+    private static final Random rnd = new Random();
 
     public static void main(String[] args) throws Exception {
         Main app = new Main();
-
         SwingUtilities.invokeLater(() -> {
             KeyCaptureWindow kcw = new KeyCaptureWindow();
             kcw.addListener(app);
-            System.out.println("KeyCaptureWindow avviata. Usa WASD e frecce per muovere camera.");
+            System.out.println("WASD muove, frecce ruotano, SPAZIO: teleporta nemico più vicino a destra");
         });
-
         Thread.sleep(100);
-        runEngine(args, app);
+        app.runEngine();
     }
 
-    private static void runEngine(String[] args, Main app) throws IOException {
-        final int width = 120, height = 100;
-        final int fps = 30;
-
-        Display display = new BrailleDisplay();
-        engine = new Engine(width, height, fps, display);
+    private void runEngine() throws IOException {
+        int width = 120, height = 100, fps = 30;
+        engine = new Engine(width, height, fps, new BrailleDisplay());
         Camera cam = engine.getCamera();
         cam.setFov(60);
         cam.setDist(10);
 
         TreeScene scene = engine.getScene();
-        loadSimpleScene(scene);
+        enemies = loadSimpleScene(scene, engine);
 
-        final double[] tAcc = { 0 };
-
-        engine.onRender((Graphics g, int w_, int h_, double delta) -> {
-            app.updateCamera(cam, delta);
-            tAcc[0] += delta;
-        });
-
+        engine.onRender((g, w_, h_, delta) -> updateCamera(cam, delta));
         engine.start();
     }
 
-    private static void loadSimpleScene(TreeScene scene) throws IOException {
-        final String PATH = "src/main/resources/scene/";
-        final String[] OBJ_FILES = { "cow.obj", "pistol.obj" };
+    private static ArrayList<Node> loadSimpleScene(TreeScene scene, Engine engine) throws IOException {
+        String PATH = "src/main/resources/scene/";
+        String[] OBJ = { "cow.obj", "pistol.obj" };
+        ArrayList<Node> list = new ArrayList<>();
 
-        // carica mucca e pistola in lista temporanea
-        List<Node> nodes = new ArrayList<>();
-        for (String objFile : OBJ_FILES) {
-            List<double[]> verts = new ArrayList<>();
-            List<int[]> faces = new ArrayList<>();
-            loadOBJ(PATH + objFile, 1.0, verts, faces);
-
-            Node node = new Node(objFile.replace(".obj", ""));
-            node.setVertices(verts);
-            node.setFaces(faces);
-            nodes.add(node);
+        for (String of : OBJ) {
+            List<double[]> vs = new ArrayList<>();
+            List<int[]> fs    = new ArrayList<>();
+            for (String line : Files.readAllLines(Paths.get(PATH + of))) {
+                if (line.startsWith("v ")) {
+                    String[] t = line.split("\\s+");
+                    vs.add(new double[]{
+                        Double.parseDouble(t[1]),
+                        Double.parseDouble(t[2]),
+                        Double.parseDouble(t[3])
+                    });
+                } else if (line.startsWith("f ")) {
+                    String[] t = line.split("\\s+");
+                    fs.add(new int[]{
+                        Integer.parseInt(t[1].split("/")[0]) - 1,
+                        Integer.parseInt(t[2].split("/")[0]) - 1,
+                        Integer.parseInt(t[3].split("/")[0]) - 1
+                    });
+                }
+            }
+            Node n = new Node(of.replace(".obj",""));
+            n.setVertices(vs);
+            n.setFaces(fs);
+            list.add(n);
         }
 
-        // PUBLIC SCENE: aggiungi solo la mucca come root
-        Node cow = nodes.get(0);
-        cow.setLocalPosition(new Vector3(3, 0, 0));
-        cow.setLocalRotation(new Vector3((float) Math.PI, (float) Math.PI/10, Math.PI/10));
+        // configure cow enemy
+        Node cow = list.get(0);
+        cow.setLocalPosition(randomPos());
         cow.setColor(Engine.Color.RED);
         scene.addNode(cow);
-
-        // animazione arcobaleno sulla mucca
-        Color[] rainbow = {
-                Engine.Color.RED, Engine.Color.GREEN, Engine.Color.BLUE,
-                Engine.Color.YELLOW, Engine.Color.CYAN, Engine.Color.MAGENTA
-        };
-        cow.startAutoUpdate(1000, n -> {
-            int idx = java.util.Arrays.asList(rainbow).indexOf(n.getColor());
-            n.setColor(rainbow[(idx + 1) % rainbow.length]);
-            float z = n.getLocalRotation().z;
-            z = -z;
-            n.setLocalRotation(new Vector3(n.getLocalRotation().x, n.getLocalRotation().y, z));
+        // auto‐wander
+        cow.setLocalRotation(new Vector3((float)Math.PI,0, 0));
+        cow.startAutoUpdate(100, n -> {
+            Vector3 p = n.getLocalPosition();
+            Vector3 delta = new Vector3(
+                (rnd.nextFloat()*5-1)*0.5f,
+                0,
+                (rnd.nextFloat()*5-1)*0.5f
+            );
+            n.setLocalPosition(p.add(delta));
         });
 
-        // prendi la camera e attaccala alla scena come secondo root
+        // camera and pistol
         Camera cam = engine.getCamera();
         scene.addNode(cam);
 
-        // configura la pistola come figlio della camera
-        Node pistol = nodes.get(1);
+        Node pistol = list.get(1);
         cam.addChild(pistol);
-
-        // fai ereditare solo la rotazione orizzontale (yaw)
-        pistol.setInheritRotation(true, false, false);
-
-        // posizionamento relativo alla camera
-        pistol.setLocalPosition(new Vector3(-4, 3, -5));
-        // ruota 180° su X e Y per allinearla alla view
-        pistol.setLocalRotation(new Vector3((float) Math.PI, (float) Math.PI, 0));
+        pistol.setInheritRotation(true,false,false);
+        pistol.setLocalPosition(new Vector3(-4,3,-5));
+        pistol.setLocalRotation(new Vector3((float)Math.PI,(float)Math.PI,0));
         pistol.setColor(Engine.Color.BLACK);
+
+        return list;  // contains cow
     }
 
-    private static void loadOBJ(String path, double scale,
-            List<double[]> verts,
-            List<int[]> faces) throws IOException {
-        for (String line : Files.readAllLines(Paths.get(path))) {
-            if (line.startsWith("v ")) {
-                String[] tok = line.split("\\s+");
-                double x = Double.parseDouble(tok[1]) * scale;
-                double y = Double.parseDouble(tok[2]) * scale;
-                double z = Double.parseDouble(tok[3]) * scale;
-                verts.add(new double[] { x, y, z });
-            } else if (line.startsWith("f ")) {
-                String[] tok = line.split("\\s+");
-                int i1 = Integer.parseInt(tok[1].split("/")[0]) - 1;
-                int i2 = Integer.parseInt(tok[2].split("/")[0]) - 1;
-                int i3 = Integer.parseInt(tok[3].split("/")[0]) - 1;
-                faces.add(new int[] { i1, i2, i3 });
-            }
-        }
+    private static Vector3 randomPos() {
+        return new Vector3(
+            (rnd.nextFloat()*2-1)*10,  // x ∈ [−10,10]
+            0,
+            (rnd.nextFloat()*2-1)*10   // z ∈ [−10,10]
+        );
     }
 
     private void updateCamera(Camera cam, double delta) {
-        // Prendi posizione e rotazione locali correnti
         Vector3 pos = cam.getLocalPosition();
         Vector3 rot = cam.getLocalRotation();
+        Vector3 forward = new Vector3(0,0,1).rotateY((float)rot.y);
+        Vector3 right   = new Vector3(1,0,0).rotateY((float)rot.y);
 
-        // Vettori forward e right in base allo yaw (rotazione Y)
-        Vector3 forward = new Vector3(0, 0, 1).rotateY((float) rot.y);
-        Vector3 right = new Vector3(1, 0, 0).rotateY((float) rot.y);
-
-        // Traslazioni WASD
-        if (w) {
-            pos = pos.add(forward.mul((float) (MOVE_SPEED * delta)));
-        }
-        if (s) {
-            pos = pos.sub(forward.mul((float) (MOVE_SPEED * delta)));
-        }
-        if (d) {
-            pos = pos.add(right.mul((float) (MOVE_SPEED * delta)));
-        }
-        if (a) {
-            pos = pos.sub(right.mul((float) (MOVE_SPEED * delta)));
-        }
+        if (w) pos = pos.add( forward.mul((float)(MOVE_SPEED*delta)));
+        if (s) pos = pos.sub( forward.mul((float)(MOVE_SPEED*delta)));
+        if (d) pos = pos.add( right.mul((float)(MOVE_SPEED*delta)));
+        if (a) pos = pos.sub( right.mul((float)(MOVE_SPEED*delta)));
         cam.setLocalPosition(pos);
 
-        // Rotazioni con le frecce
-        if (left)
-            cam.rotateY((float) (-ROT_SPEED * delta)); // gira verso sinistra
-        if (rightt)
-            cam.rotateY((float) (ROT_SPEED * delta)); // verso destra
+        if (left)   cam.rotateY((float)(-ROT_SPEED*delta));
+        if (rightt) cam.rotateY((float)( ROT_SPEED*delta));
 
-        // Clamp del pitch (rotazione X) per non capovolgere
-        Vector3 newRot = cam.getLocalRotation();
-        double maxPitch = Math.toRadians(89);
-        double clampedPitch = Math.max(-maxPitch, Math.min(maxPitch, newRot.x));
-        cam.setLocalRotation(new Vector3((float) clampedPitch, (float) newRot.y, (float) newRot.z));
+        Vector3 r2 = cam.getLocalRotation();
+        double mp = Math.toRadians(89), cp = Math.max(-mp, Math.min(mp, r2.x));
+        cam.setLocalRotation(new Vector3((float)cp,(float)r2.y,(float)r2.z));
     }
 
     @Override
     public void onKeyDown(KeyEvent e) {
         switch (e.getKeyCode()) {
-            case KeyEvent.VK_W:
-                w = true;
-                break;
-            case KeyEvent.VK_A:
-                a = true;
-                break;
-            case KeyEvent.VK_S:
-                s = true;
-                break;
-            case KeyEvent.VK_D:
-                d = true;
-                break;
-            case KeyEvent.VK_LEFT:
-                left = true;
-                break;
-            case KeyEvent.VK_RIGHT:
-                rightt = true;
-                break;
-            case KeyEvent.VK_ESCAPE:
-                System.out.print(Color.RESET);
-                Camera cam = engine.getCamera();
-                System.out.println("Camera position: " + cam.getLocalPosition().x + ", " + cam.getLocalPosition().y
-                        + ", " + cam.getLocalPosition().z);
-                // wait for 5 seconds
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
-                }
-                System.exit(0);
-                break;
+            case KeyEvent.VK_W: w=true; break;
+            case KeyEvent.VK_A: a=true; break;
+            case KeyEvent.VK_S: s=true; break;
+            case KeyEvent.VK_D: d=true; break;
+            case KeyEvent.VK_LEFT:  left=true; break;
+            case KeyEvent.VK_RIGHT: rightt=true; break;
+            case KeyEvent.VK_SPACE: relocateNearestRight(); break;
+        }
+    }
+
+    private void relocateNearestRight() {
+        Camera cam = engine.getCamera();
+        Transform ct = cam.getGlobalTransform();
+        Vector3 camPos   = ct.position;
+        Vector3 camRight = new Vector3(1,0,0)
+            .rotateZ((float)ct.rotation.z)
+            .rotateY((float)ct.rotation.y)
+            .rotateX((float)ct.rotation.x);
+
+        Node best = null;
+        double bestDist = Double.POSITIVE_INFINITY;
+        for (Node enemy : enemies) {
+            Vector3 epos = enemy.getGlobalTransform().position;
+            Vector3 diff = epos.sub(camPos);
+            if (diff.dot(camRight) <= 0) continue;
+            double d2 = diff.dot(diff);
+            if (d2 < bestDist) {
+                bestDist = d2;
+                best = enemy;
+            }
+        }
+        if (best != null) {
+            best.setLocalPosition(randomPos());
+            System.out.println("Mucca uccisa");
         }
     }
 
     @Override
     public void onKeyUp(KeyEvent e) {
         switch (e.getKeyCode()) {
-            case KeyEvent.VK_W:
-                w = false;
-                break;
-            case KeyEvent.VK_A:
-                a = false;
-                break;
-            case KeyEvent.VK_S:
-                s = false;
-                break;
-            case KeyEvent.VK_D:
-                d = false;
-                break;
-            case KeyEvent.VK_LEFT:
-                left = false;
-                break;
-            case KeyEvent.VK_RIGHT:
-                rightt = false;
-                break;
+            case KeyEvent.VK_W: w=false; break;
+            case KeyEvent.VK_A: a=false; break;
+            case KeyEvent.VK_S: s=false; break;
+            case KeyEvent.VK_D: d=false; break;
+            case KeyEvent.VK_LEFT:  left=false; break;
+            case KeyEvent.VK_RIGHT: rightt=false; break;
         }
     }
 }
