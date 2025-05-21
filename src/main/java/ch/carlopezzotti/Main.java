@@ -2,6 +2,7 @@
 package ch.carlopezzotti;
 
 import ch.carlopezzotti.engine.BrailleDisplay;
+import ch.carlopezzotti.engine.Camera;
 import ch.carlopezzotti.engine.Display;
 import ch.carlopezzotti.engine.Engine;
 import ch.carlopezzotti.engine.Engine.Color;
@@ -21,10 +22,11 @@ import java.util.List;
 
 public class Main implements KeyCaptureWindow.KeyListener {
     private volatile boolean w, a, s, d;
-    private volatile boolean left, rightt, up, down;
+    private volatile boolean left, rightt;
 
     private static final double MOVE_SPEED = 10.0;
-    private static final double ROT_SPEED = -Math.PI / 10;
+    private static final double ROT_SPEED = Math.PI;
+    private static Engine engine;
 
     public static void main(String[] args) throws Exception {
         Main app = new Main();
@@ -44,20 +46,13 @@ public class Main implements KeyCaptureWindow.KeyListener {
         final int fps = 30;
 
         Display display = new BrailleDisplay();
-        Engine engine = new Engine(width, height, fps, display);
-        Engine.Camera cam = engine.getCamera();
+        engine = new Engine(width, height, fps, display);
+        Camera cam = engine.getCamera();
+        cam.setFov(60);
+        cam.setDist(10);
 
         TreeScene scene = engine.getScene();
         loadSimpleScene(scene);
-
-        cam.x = 0;
-        cam.y = 0;
-        cam.z = 90;
-        cam.yaw = 0;
-        cam.pitch = 0;
-        cam.roll = 0;
-        cam.fov = 70;
-        cam.dist = 100;
 
         final double[] tAcc = { 0 };
 
@@ -71,46 +66,57 @@ public class Main implements KeyCaptureWindow.KeyListener {
 
     private static void loadSimpleScene(TreeScene scene) throws IOException {
         final String PATH = "src/main/resources/scene/";
-        final String[] OBJ_FILES = {
-                "cow.obj",
-                "teapot.obj"
-        };
+        final String[] OBJ_FILES = { "cow.obj", "pistol.obj" };
 
+        // carica mucca e pistola in lista temporanea
         List<Node> nodes = new ArrayList<>();
         for (String objFile : OBJ_FILES) {
             List<double[]> verts = new ArrayList<>();
             List<int[]> faces = new ArrayList<>();
             loadOBJ(PATH + objFile, 1.0, verts, faces);
+
             Node node = new Node(objFile.replace(".obj", ""));
-            node.setFaces(faces);
             node.setVertices(verts);
+            node.setFaces(faces);
             nodes.add(node);
         }
-        Node ref = nodes.get(0);
-        ref.setLocalPosition(new Vector3(0, 10, 0));
-        ref.setColor(Color.RED);
+
+        // PUBLIC SCENE: aggiungi solo la mucca come root
+        Node cow = nodes.get(0);
+        cow.setLocalPosition(new Vector3(3, 0, 0));
+        cow.setLocalRotation(new Vector3((float) Math.PI, (float) Math.PI/10, Math.PI/10));
+        cow.setColor(Engine.Color.RED);
+        scene.addNode(cow);
+
+        // animazione arcobaleno sulla mucca
         Color[] rainbow = {
-                Color.RED, Color.GREEN, Color.BLUE,
-                Color.YELLOW, Color.CYAN, Color.MAGENTA
+                Engine.Color.RED, Engine.Color.GREEN, Engine.Color.BLUE,
+                Engine.Color.YELLOW, Engine.Color.CYAN, Engine.Color.MAGENTA
         };
-        ref.startAutoUpdate(1000, (n) -> {
-            int index = 0;
-            for (int i = 0; i < rainbow.length; i++) {
-                if (n.getColor() == rainbow[i]) {
-                    index = i;
-                    break;
-                }
-            }
-            index = (index + 1) % rainbow.length;
-            n.setColor(rainbow[index]);
+        cow.startAutoUpdate(1000, n -> {
+            int idx = java.util.Arrays.asList(rainbow).indexOf(n.getColor());
+            n.setColor(rainbow[(idx + 1) % rainbow.length]);
+            float z = n.getLocalRotation().z;
+            z = -z;
+            n.setLocalRotation(new Vector3(n.getLocalRotation().x, n.getLocalRotation().y, z));
         });
 
-        nodes.get(1).startAutoUpdate(10, (n) -> {
-            Vector3 tmp = n.getLocalPosition();
-            n.rotateX(0.01f);
-        });
+        // prendi la camera e attaccala alla scena come secondo root
+        Camera cam = engine.getCamera();
+        scene.addNode(cam);
 
-        nodes.forEach(scene::addNode);
+        // configura la pistola come figlio della camera
+        Node pistol = nodes.get(1);
+        cam.addChild(pistol);
+
+        // fai ereditare solo la rotazione orizzontale (yaw)
+        pistol.setInheritRotation(true, false, false);
+
+        // posizionamento relativo alla camera
+        pistol.setLocalPosition(new Vector3(-4, 3, -5));
+        // ruota 180° su X e Y per allinearla alla view
+        pistol.setLocalRotation(new Vector3((float) Math.PI, (float) Math.PI, 0));
+        pistol.setColor(Engine.Color.BLACK);
     }
 
     private static void loadOBJ(String path, double scale,
@@ -133,31 +139,41 @@ public class Main implements KeyCaptureWindow.KeyListener {
         }
     }
 
-    private void updateCamera(Engine.Camera cam, double delta) {
-        Vector3 right = new Vector3(1, 0, 0).rotateZ((float) cam.yaw);
+    private void updateCamera(Camera cam, double delta) {
+        // Prendi posizione e rotazione locali correnti
+        Vector3 pos = cam.getLocalPosition();
+        Vector3 rot = cam.getLocalRotation();
 
-        if (a) {
-            cam.x -= right.x * MOVE_SPEED * delta;
-            cam.y -= right.y * MOVE_SPEED * delta;
-        }
-        if (d) {
-            cam.x += right.x * MOVE_SPEED * delta;
-            cam.y += right.y * MOVE_SPEED * delta;
-        }
+        // Vettori forward e right in base allo yaw (rotazione Y)
+        Vector3 forward = new Vector3(0, 0, 1).rotateY((float) rot.y);
+        Vector3 right = new Vector3(1, 0, 0).rotateY((float) rot.y);
+
+        // Traslazioni WASD
         if (w) {
-            cam.dist = Math.max(1.0, cam.dist - MOVE_SPEED * delta);
+            pos = pos.add(forward.mul((float) (MOVE_SPEED * delta)));
         }
         if (s) {
-            cam.dist += MOVE_SPEED * delta;
+            pos = pos.sub(forward.mul((float) (MOVE_SPEED * delta)));
         }
+        if (d) {
+            pos = pos.add(right.mul((float) (MOVE_SPEED * delta)));
+        }
+        if (a) {
+            pos = pos.sub(right.mul((float) (MOVE_SPEED * delta)));
+        }
+        cam.setLocalPosition(pos);
+
+        // Rotazioni con le frecce
         if (left)
-            cam.yaw -= ROT_SPEED * delta;
+            cam.rotateY((float) (-ROT_SPEED * delta)); // gira verso sinistra
         if (rightt)
-            cam.yaw += ROT_SPEED * delta;
-        if (up)
-            cam.pitch += ROT_SPEED * delta;
-        if (down)
-            cam.pitch -= ROT_SPEED * delta;
+            cam.rotateY((float) (ROT_SPEED * delta)); // verso destra
+
+        // Clamp del pitch (rotazione X) per non capovolgere
+        Vector3 newRot = cam.getLocalRotation();
+        double maxPitch = Math.toRadians(89);
+        double clampedPitch = Math.max(-maxPitch, Math.min(maxPitch, newRot.x));
+        cam.setLocalRotation(new Vector3((float) clampedPitch, (float) newRot.y, (float) newRot.z));
     }
 
     @Override
@@ -181,11 +197,18 @@ public class Main implements KeyCaptureWindow.KeyListener {
             case KeyEvent.VK_RIGHT:
                 rightt = true;
                 break;
-            case KeyEvent.VK_UP:
-                up = true;
-                break;
-            case KeyEvent.VK_DOWN:
-                down = true;
+            case KeyEvent.VK_ESCAPE:
+                System.out.print(Color.RESET);
+                Camera cam = engine.getCamera();
+                System.out.println("Camera position: " + cam.getLocalPosition().x + ", " + cam.getLocalPosition().y
+                        + ", " + cam.getLocalPosition().z);
+                // wait for 5 seconds
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException ex) {
+                    ex.printStackTrace();
+                }
+                System.exit(0);
                 break;
         }
     }
@@ -211,15 +234,6 @@ public class Main implements KeyCaptureWindow.KeyListener {
             case KeyEvent.VK_RIGHT:
                 rightt = false;
                 break;
-            case KeyEvent.VK_UP:
-                up = false;
-                break;
-            case KeyEvent.VK_DOWN:
-                down = false;
-                break;
-            case KeyEvent.VK_ESCAPE:
-                System.out.print(Color.RESET);
-                System.exit(0);
         }
     }
 }
