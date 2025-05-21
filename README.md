@@ -1,72 +1,111 @@
-# TAD - Terminal ASCII Display 3D Engine
 
-A simple Java 3D engine that renders OBJ models in the terminal using Unicode Braille characters and ANSI colors. Supports camera movement via keyboard (WASD + arrow keys).
+# TAD — Terminal ASCII Display 3D Engine
 
-## Features
+A lightweight Java 3D engine that renders OBJ models directly in your terminal using Unicode Braille characters and ANSI colors.  
+Navigate in real time with keyboard controls, animate your scene graph, and extend with custom models and behaviors.
 
-- Renders 3D OBJ models in the terminal using Braille characters.
-- Supports colored output with ANSI escape codes.
-- Camera movement and rotation via keyboard (WASD + arrow keys).
-- Scene graph with hierarchical nodes and auto-update for animation.
-- Cross-platform (Windows/Unix).
+---
 
-## Requirements
+## 🚀 Features
 
-- Java 17 or higher
-- Maven
+- **Braille-based rendering**: Efficiently packs 2×4 pixel blocks into one Braille character for high-resolution terminal output.
+- **ANSI color support**: Per-vertex and per-object coloring via ANSI escape codes.
+- **Interactive camera**: Move and rotate the camera with WASD and arrow keys.
+- **Scene graph**: Hierarchical `Node`-based structure with parent/child transforms.
+- **Auto-update**: Per-node background threads for smooth, programmatic animations.
+- **Cross-platform**: Works on Unix and Windows terminals (including Windows Terminal).
 
-## Usage
+---
 
-### 1. Build
+## 🛠 Requirements
 
-```sh
+- **Java 17** or higher
+- **Maven** (for building and running via `mvn`)
+- A terminal with Braille and ANSI support:
+  - **Windows**: Windows Terminal with “Segoe UI Emoji” or similar font  
+  - **Unix**: Most modern Linux/macOS terminals
+
+---
+
+## 🎯 Getting Started
+
+### 1. Clone & Build
+
+```bash
+git clone https://github.com/your-user/tad-engine.git
+cd tad-engine
 mvn clean package
-```
+````
 
 ### 2. Run
 
-```sh
-mvn exec:java -Dexec.mainClass="ch.carlopezzotti.Main"
+#### Via Maven
+
+```bash
+mvn exec:java \
+  -Dexec.mainClass="ch.carlopezzotti.Main"
 ```
 
-Or, if you prefer to run the compiled JAR:
+#### Via JAR
 
-```sh
+```bash
 java -cp target/tad-1.0-SNAPSHOT.jar ch.carlopezzotti.Main
 ```
 
-### 3. Controls
+---
 
-- **W/S**: Zoom in/out (move camera forward/backward)
-- **A/D**: Move camera left/right
-- **Arrow Left/Right**: Rotate camera yaw
-- **Arrow Up/Down**: Rotate camera pitch
-- **ESC**: Exit
+## 🎮 Controls
 
-## Example
+| Key       | Action                                   |
+| --------- | ---------------------------------------- |
+| **W / S** | Move camera forward / backward           |
+| **A / D** | Strafe camera left / right               |
+| **← / →** | Rotate camera yaw (pan left / right)     |
+| **ESC**   | Exit application                         |
+| **SPACE** | (Custom) Teleport nearest enemy to right |
 
-By default, the engine loads two OBJ files from `src/main/resources/scene/`:
+---
 
-- `cow.obj`
-- `teapot.obj`
+## 📂 Project Structure
 
-You should see a colored 3D rendering of these models in your terminal. The first model cycles through rainbow colors, and the second rotates automatically.
+```
+├── pom.xml
+├── README.md
+├── src
+│   ├── main
+│   │   ├── java
+│   │   │   └── ch.carlopezzotti
+│   │   │       ├── Main.java            # Entry point & input handling
+│   │   │       └── engine
+│   │   │           ├── Engine.java       # Core loop, projection, input
+│   │   │           ├── Display.java      # Display interface
+│   │   │           ├── BrailleDisplay.java # Terminal Braille renderer
+│   │   │           ├── Camera.java       # Camera node subclass
+│   │   │           ├── Node.java         # Scene graph node
+│   │   │           ├── TreeScene.java    # Recursive scene renderer
+│   │   │           └── KeyCaptureWindow.java # Keyboard listener window
+│   │   └── resources
+│   │       └── scene
+│   │           ├── cow.obj
+│   │           └── teapot.obj
+└──
+```
 
-## Adding More Models
+---
 
-Place additional `.obj` files in `src/main/resources/scene/` and add their filenames to the `OBJ_FILES` array in [`Main.java`](src/main/java/ch/carlopezzotti/Main.java).
+## ⚙️ Configuration & Extension
 
-## Notes
+* **Adding models**
 
-- For best results on Windows, use Windows Terminal with the "Segoe UI Emoji" font.
-- On Unix, the terminal is set to raw mode for better key capture; it will restore settings on exit.
+  1. Place `.obj` files in `src/main/resources/scene/`.
+  2. Edit the `OBJ_FILES` array in `Main.java`’s `loadSimpleScene(...)`.
 
-## Project Structure
+* **Custom animations**
+  Use `node.startAutoUpdate(intervalMillis, node -> { ... })` to drive per-node logic.
 
-- [`Main.java`](src/main/java/ch/carlopezzotti/Main.java): Entry point, scene setup, and input handling.
-- [`engine/`](src/main/java/ch/carlopezzotti/engine/): Core engine classes (rendering, display, scene graph).
-- [`engine/helper/`](src/main/java/ch/carlopezzotti/engine/helper/): Math utilities (vectors, transforms).
-- [`src/main/resources/scene/`](src/main/resources/scene/): OBJ models.
+* **Changing controls**
+  Modify `Main.onKeyDown(...)` and `updateCamera(...)` for bespoke input mappings.
 
-## License
+---
 
+> Crafted with ❤️ by Carlo Pezzotti

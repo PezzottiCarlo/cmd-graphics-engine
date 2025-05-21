@@ -51,7 +51,7 @@ public class Main implements KeyCaptureWindow.KeyListener {
 
     private static ArrayList<Node> loadSimpleScene(TreeScene scene, Engine engine) throws IOException {
         String PATH = "src/main/resources/scene/";
-        String[] OBJ = { "cow.obj", "pistol.obj" };
+        String[] OBJ = { "cow.obj", "pistol.obj","newscene.obj" };
         ArrayList<Node> list = new ArrayList<>();
 
         for (String of : OBJ) {
