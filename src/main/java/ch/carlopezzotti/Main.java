@@ -35,30 +35,21 @@ public class Main implements KeyCaptureWindow.KeyListener {
             System.out.println("KeyCaptureWindow avviata. Usa WASD e frecce per muovere camera.");
         });
 
-        Thread.sleep(100); // breve attesa per setup tastiera
-
-        // Carica oggetti e avvia l'engine
+        Thread.sleep(100);
         runEngine(args, app);
     }
 
     private static void runEngine(String[] args, Main app) throws IOException {
         final int width = 120, height = 100;
         final int fps = 30;
-        final double objRotSpeed = Math.PI / 2;
-        final double scale = 1.0;
-        final boolean rotateX = false, rotateY = true, rotateZ = false;
-
-        // Caricamento OBJ
 
         Display display = new BrailleDisplay();
         Engine engine = new Engine(width, height, fps, display);
         Engine.Camera cam = engine.getCamera();
 
-        // Setup scena
         TreeScene scene = engine.getScene();
         loadSimpleScene(scene);
 
-        // Camera iniziale
         cam.x = 0;
         cam.y = 0;
         cam.z = 90;
@@ -73,14 +64,12 @@ public class Main implements KeyCaptureWindow.KeyListener {
         engine.onRender((Graphics g, int w_, int h_, double delta) -> {
             app.updateCamera(cam, delta);
             tAcc[0] += delta;
-            // TreeScene sarà renderizzato automaticamente dall'Engine
         });
 
         engine.start();
     }
 
     private static void loadSimpleScene(TreeScene scene) throws IOException {
-        //load the folder in the resource folder
         final String PATH = "src/main/resources/scene/";
         final String[] OBJ_FILES = {
                 "cow.obj",
@@ -105,7 +94,6 @@ public class Main implements KeyCaptureWindow.KeyListener {
                 Color.YELLOW, Color.CYAN, Color.MAGENTA
         };
         ref.startAutoUpdate(1000, (n) -> {
-            // find the index of the current color in rainbow
             int index = 0;
             for (int i = 0; i < rainbow.length; i++) {
                 if (n.getColor() == rainbow[i]) {

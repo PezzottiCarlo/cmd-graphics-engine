@@ -18,20 +18,17 @@ public class KeyCaptureWindow extends JFrame {
     private Point mouseDragOffset;
 
     public KeyCaptureWindow() {
-        super("KeyCapture");         // titolo per aiuto al focus
+        super("KeyCapture");
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        setUndecorated(false);       // mantiene la barra del titolo per poter spostare
-        setSize(100, 100);           // abbastanza grande da poter ricevere focus
+        setUndecorated(false);
+        setSize(100, 100);
         setAlwaysOnTop(true);
         setFocusable(true);
-
-        // posiziona in basso a sinistra (sopra la taskbar)
         Rectangle usable = GraphicsEnvironment
             .getLocalGraphicsEnvironment()
             .getMaximumWindowBounds();
         setLocation(usable.x, usable.y + usable.height - getHeight());
 
-        // Key events
         addKeyListener(new java.awt.event.KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
@@ -42,8 +39,6 @@ public class KeyCaptureWindow extends JFrame {
                 listeners.forEach(l -> l.onKeyUp(e));
             }
         });
-
-        // Mouse events per drag-and-move della finestra
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -58,8 +53,6 @@ public class KeyCaptureWindow extends JFrame {
                             loc.y + e.getY() - mouseDragOffset.y);
             }
         });
-
-        // Se perde il focus, riportala avanti
         addWindowFocusListener(new WindowAdapter() {
             @Override
             public void windowLostFocus(WindowEvent e) {
@@ -69,8 +62,6 @@ public class KeyCaptureWindow extends JFrame {
                 });
             }
         });
-
-        // Mostra e richiedi il focus
         SwingUtilities.invokeLater(() -> {
             setVisible(true);
             toFront();

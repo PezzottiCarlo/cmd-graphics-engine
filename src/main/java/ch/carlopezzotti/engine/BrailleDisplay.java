@@ -11,39 +11,31 @@ public class BrailleDisplay implements Display {
         try {
             String os = System.getProperty("os.name").toLowerCase();
             if (os.contains("windows")) {
-                // Windows: abilita UTF-8
                 new ProcessBuilder("cmd", "/c", "chcp", "65001")
                         .inheritIO().start().waitFor();
                 System.out.println("→ Usare Windows Terminal con font Segoe UI Emoji");
             } else {
-                // Unix: metti terminale in raw mode (no echo, no canonical)
                 new ProcessBuilder("sh", "-c", "stty raw -echo </dev/tty")
                         .inheritIO().start().waitFor();
-                // Ripristino su exit
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                     try {
                         new ProcessBuilder("sh", "-c", "stty sane </dev/tty")
                                 .inheritIO().start().waitFor();
-                        // mostra cursore
                         System.out.print("\u001B[?25h");
                     } catch (Exception e) {
-                        // ignore
                     }
                 }));
             }
         } catch (Exception ignored) {
         }
-
-        // Clear screen, move cursor home, hide cursor
-        System.out.print("\u001B[2J"); // Clear entire screen
-        System.out.print("\u001B[H"); // Cursor to home
-        System.out.print("\u001B[?25l"); // Hide cursor
+        System.out.print("\u001B[2J");
+        System.out.print("\u001B[H");
+        System.out.print("\u001B[?25l");
         System.out.flush();
     }
 
     @Override
     public void clear() {
-        // Move cursor to home without clearing
         System.out.print("\u001B[H");
         System.out.flush();
     }

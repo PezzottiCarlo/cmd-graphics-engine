@@ -1,4 +1,4 @@
-// File: src/ch/carlopezzotti/engine/Engine.java
+
 package ch.carlopezzotti.engine;
 
 import java.io.IOException;
@@ -110,7 +110,6 @@ public class Engine {
             long now = System.nanoTime();
             double delta = (now - last) / 1e9;
             last = now;
-            // clear buffer
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
                     colorBuffer[y][x] = null;
@@ -150,7 +149,6 @@ public class Engine {
             scene.renderAll(this, g, width, height);
             if (renderCallback != null)
                 renderCallback.render(g, width, height, delta);
-            // flatten and draw with colors
             int[] flat = new int[width * height];
             Color[] cols = new Color[width * height];
             int idx = 0;

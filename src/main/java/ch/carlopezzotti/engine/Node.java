@@ -9,15 +9,10 @@ import java.util.function.Consumer;
 import ch.carlopezzotti.engine.helper.Transform;
 import ch.carlopezzotti.engine.helper.Vector3;
 
-/**
- * Rappresenta un oggetto nella scena: ha id, posizione locale, colore,
- * vertici, facce, parent e children. Calcola posizione globale ricorsivamente.
- * In più può avviare un thread interno per il proprio aggiornamento continuo.
- */
 public class Node {
     private final String id;
     private Vector3 localPosition = new Vector3(0, 0, 0);
-    private Vector3 localRotation = new Vector3(0, 0, 0); // Euler angles in radians
+    private Vector3 localRotation = new Vector3(0, 0, 0); 
     private Vector3 localScale    = new Vector3(1, 1, 1);
     private Engine.Color color = Engine.Color.WHITE;
     private final List<double[]> vertices = new ArrayList<>();
@@ -25,7 +20,6 @@ public class Node {
     private Node parent;
     private final List<Node> children = new ArrayList<>();
     
-    // auto‐update support
     private Thread updateThread;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
@@ -36,25 +30,15 @@ public class Node {
     public String getId() {
         return id;
     }
-
-    // Trasformazioni locali
     public Vector3 getLocalPosition() { return localPosition; }
     public void setLocalPosition(Vector3 pos) { this.localPosition = pos; }
-
     public Vector3 getLocalRotation() { return localRotation; }
-    /** Imposta gli angoli di rotazione (in radianti) su X,Y,Z */
     public void setLocalRotation(Vector3 rot) { this.localRotation = rot; }
-    /** Ruota localmente attorno all'asse X di angle radianti */
     public void rotateX(float angle) { this.localRotation = this.localRotation.add(new Vector3(angle, 0, 0)); }
-    /** Ruota localmente attorno all'asse Y di angle radianti */
     public void rotateY(float angle) { this.localRotation = this.localRotation.add(new Vector3(0, angle, 0)); }
-    /** Ruota localmente attorno all'asse Z di angle radianti */
     public void rotateZ(float angle) { this.localRotation = this.localRotation.add(new Vector3(0, 0, angle)); }
-
     public Vector3 getLocalScale() { return localScale; }
-    /** Imposta la scala locale (x,y,z) */
     public void setLocalScale(Vector3 scale) { this.localScale = scale; }
-    /** Applica una scala uniforme */
     public void scale(float s) { this.localScale = this.localScale.mul(s); }
 
     public Engine.Color getColor() { return color; }
@@ -76,7 +60,6 @@ public class Node {
     }
     public List<Node> getChildren() { return children; }
 
-    /** Restituisce la matrice di trasformazione globale come combinazione ricorsiva */
     public Transform getGlobalTransform() {
         Transform t = new Transform(localPosition, localRotation, localScale);
         if (parent != null) {
@@ -86,7 +69,6 @@ public class Node {
         return t;
     }
 
-    /** Utility: applica la trasformazione globale a un vertice locale */
     public int[] projectVertex(Engine engine, double[] v) {
         Transform gt = getGlobalTransform();
         Vector3 tv = gt.apply(new Vector3((float)v[0], (float)v[1], (float)v[2]));
